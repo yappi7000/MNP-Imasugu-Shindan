@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>あなたの乗り換え診断｜削減額＆キャッシュバックシミュレーション</title>
+<title>あなたの乗り換え診断｜今の契約の見直しポイント</title>
 <style>
   :root{
     --navy:#0B1B33;
@@ -131,18 +131,23 @@
     background:var(--sky);border-radius:12px;padding:12px 14px;font-size:12.5px;
     line-height:1.7;color:var(--navy);margin-bottom:20px;border-left:4px solid var(--blue);
   }
+  .hidden-note{font-size:12px;line-height:1.7;color:var(--gray);margin-top:4px;}
+  .disclaimer{
+    border:1px solid var(--line, #E4E7EC);border-radius:12px;padding:12px 14px;font-size:12px;
+    line-height:1.7;color:var(--navy);margin-bottom:20px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <span class="eyebrow"><span class="dot"></span>やっぴ〜Presents</span>
-  <h1>あなたの乗り換え診断<br>削減額＆キャッシュバック丸わかり</h1>
-  <p class="sub">全22問、選ぶだけ。今のキャリア・使い方・家族構成から、乗り換えでどれだけ得するかをシミュレーションします。</p>
+  <h1>あなたの乗り換え診断<br>今の契約の見直しポイント</h1>
+  <p class="sub" id="sub">全23問、選ぶだけ。今のキャリア・使い方・家族構成から、今の契約で見直す余地がある項目を整理します。</p>
 
   <div class="card" id="card"></div>
 
-  <p class="footer-note">※ 金額は入力内容から算出した目安です。実際のキャッシュバック額・料金は時期やキャンペーン内容により変動します。</p>
+  <p class="footer-note">※ 現在の契約を見直すための概算です。実際の料金・割引・還元条件は申込先で確認してください。</p>
 </div>
 
 <script>
@@ -230,16 +235,19 @@ const questions = [
 
 let current = 0;
 let answers = [];
-const facts = { billMid:6000, dataTag:"mid", callTag:"short", familyTag:"1", netsetTag:"unset", energysetTag:"unset", carrierTag:"online" };
+// 金額（削減見込み・キャッシュバック）は表示しない。
+// 再表示する場合は、比べる料金・還元額の出典・確認日・適用条件を再点検してから実装し直す（旧ロジックは index.before-2026-10-25.html）。
+const facts = { billText:"", dataText:"", callText:"", familyTag:"1", netsetTag:"unset", energysetTag:"unset" };
 
 const card = document.getElementById('card');
+document.getElementById('sub').textContent = `全${questions.length}問、選ぶだけ。今のキャリア・使い方・家族構成から、今の契約で見直す余地がある項目を整理します。`;
 
 function renderIntro(){
   card.innerHTML = `
     <ul class="intro-list">
-      <li><span class="num">1</span>全22問、直感で選ぶだけ（所要3分）</li>
+      <li><span class="num">1</span>全${questions.length}問、直感で選ぶだけ（所要3分）</li>
       <li><span class="num">2</span>キャリア・使い方・家族構成・セット割まで丸ごと診断</li>
-      <li><span class="num">3</span>乗り換えた場合の削減額とキャッシュバック目安が分かる</li>
+      <li><span class="num">3</span>見直す余地がある項目（キャンペーン・プラン・家族割・セット割）が分かる</li>
     </ul>
     <button class="startbtn" onclick="startQuiz()">診断をはじめる →</button>
   `;
@@ -274,13 +282,12 @@ function selectOpt(i){
   const chosen = item.opts[i];
   answers[current] = chosen;
 
-  if(item.key === "bill") facts.billMid = chosen.mid;
-  if(item.key === "data") facts.dataTag = chosen.tag;
-  if(item.key === "call") facts.callTag = chosen.tag;
+  if(item.key === "bill") facts.billText = chosen.t;
+  if(item.key === "data") facts.dataText = chosen.t;
+  if(item.key === "call") facts.callText = chosen.t;
   if(item.key === "family") facts.familyTag = chosen.tag;
   if(item.key === "netset") facts.netsetTag = chosen.tag;
   if(item.key === "energyset") facts.energysetTag = chosen.tag;
-  if(item.key === "carrier") facts.carrierTag = chosen.tag;
 
   if(current < questions.length - 1){ current++; renderQuestion(); }
   else { renderResult(); }
@@ -288,175 +295,70 @@ function selectOpt(i){
 
 function goBack(){ if(current>0){ current--; renderQuestion(); } }
 
-function calcTargetPlan(){
-  const dataBase = {low:990, mid:1980, high:2970, veryhigh:3980};
-  const callAdd = {none:0, short:500, unlimited:1600};
-  let base = dataBase[facts.dataTag] ?? 1980;
-  base += callAdd[facts.callTag] ?? 500;
-
-  // 家族割の余地
-  const familyAdjust = {"1":0,"2":300,"3":500,"5":700};
-  base -= familyAdjust[facts.familyTag] ?? 0;
-
-  // セット割の余地（すでにset済みなら効果は乗り換え後も同様に見込める分だけ差し引き）
-  if(facts.netsetTag !== "set") base -= 300;
-  if(facts.energysetTag !== "set") base -= 100;
-
-  return Math.max(base, 850);
-}
-
-function calcCashback(){
-  // キャリア種別ごとの乗り換えキャッシュバック目安レンジ
-  const ranges = {
-    big:    [30000, 40000], // docomo実績3.5万を軸に設定
-    sub:    [40000, 50000], // UQ・Y!mobile実績4.5万を軸に設定（Y!mobileは内2.5万がPayPay）
-    online: [5000, 15000],  // 推測です（ahamo/povo/LINEMO実額は未反映）
-    mvno:   [3000, 10000],  // 推測です（格安SIM実額は未反映）
-  };
-  const [lo, hi] = ranges[facts.carrierTag] ?? [5000,15000];
-  return {lo, hi, mid: Math.round(((lo+hi)/2)/1000)*1000};
-}
-
 function renderResult(){
-  const totalPoints = answers.reduce((s,a)=>s+a.p,0);
-  const maxPoints = questions.length * 3;
-  const pct = Math.round((totalPoints/maxPoints)*100);
+  const a = i => answers[i].t;
 
-  const targetCost = calcTargetPlan();
-  const monthlySavings = Math.max(Math.round((facts.billMid - targetCost)/100)*100, 0);
-  const yearlySavings = monthlySavings * 12;
-  const cb = calcCashback();
-  const firstYearTotal = yearlySavings + cb.mid;
-
-  // 家族全体（回線数ぶん）の合計
-  const lineCountMap = {"1":1, "2":2, "3":4, "5":5}; // "3"=3〜4人ぶんの代表値として4回線で計算
-  const lineCount = lineCountMap[facts.familyTag] ?? 1;
-  const famMonthlySavings = monthlySavings * lineCount;
-  const famYearlySavings = yearlySavings * lineCount;
-  const famCashback = cb.mid * lineCount;
-  const famFirstYearTotal = famYearlySavings + famCashback;
-
-  let rank, rankColor, title, desc, urgency;
-  if(pct >= 76){
-    rank="Sランク"; rankColor="var(--red)";
-    title="今日中に動くべきタイプ🚨";
-    desc="今の契約、放置している時間がそのままコストになってます。診断結果を見る限り、動かない理由がほぼありません。";
-    urgency="この条件だと、迷ってる1ヶ月で数千円〜1万円が消えてる計算。今日、重い腰を上げるのが一番安上がりです。";
-  } else if(pct >= 51){
-    rank="Aランク"; rankColor="var(--amber)";
-    title="今月中に動くべきタイプ⚠️";
-    desc="プラン・キャンペーンのどちらかがすでに今のあなたに合わなくなってます。今月中の見直しがおすすめ。";
-    urgency="キャッシュバックには期限があるものも多いので、検討期間を空けすぎると条件が変わることも。";
-  } else if(pct >= 26){
-    rank="Bランク"; rankColor="var(--blue)";
-    title="来月までに動くべきタイプ🔧";
-    desc="ベースはそこまで悪くないですが、セット割や家族割まわりに伸びしろがあります。";
-    urgency="今の内容でも、乗り換えるだけで受け取れるキャッシュバックはそのまま利益になります。";
-  } else {
-    rank="Cランク"; rankColor="var(--green)";
-    title="それでも動く価値ありタイプ✅";
-    desc="かなり最適化できてる方です。ただしキャッシュバックだけは「今のプランのまま」でも受け取れる可能性があります。";
-    urgency="削減額は小さくても、キャッシュバック分はまるっとプラスになります。";
-  }
-
-  const bdItems = [
-    {label:"契約タイプ・キャンペーン残存", flag:(answers[0].p+answers[2].p)>=3},
-    {label:"データ・通話プランのミスマッチ", flag:(answers[4].p+answers[5].p)>=3},
-    {label:"家族割の活用余地", flag:answers[12].p>=2},
-    {label:"セット割（ネット・電気）の未活用", flag:facts.netsetTag!=="set" || facts.energysetTag!=="set"},
-    {label:"見直し放置度", flag:(answers[18].p+answers[19].p)>=3},
+  // 回答から導ける確認事項。priority=回答から見て先に確認したい項目
+  const items = [
+    {label:"割引の終了時期", answer:`契約からの期間：${a(1)}／契約時の割引：${a(2)}`,
+     todo:"契約時の割引がいつ終わるか（終わったか）と、終了後の月額を、契約中のキャリアのマイページか明細で確認する。",
+     priority: ["半分くらい終わってそう","もう終わっていると思う","覚えてない"].includes(a(2))},
+    {label:"データ量・通話の使い方", answer:`データ：${facts.dataText}／通話：${facts.callText}`,
+     todo:"今のプランのデータ容量と通話オプションが、この使い方に合っているかを明細で確認する。",
+     priority:false},
+    {label:"家族割", answer:`家族：${a(10)}／家族割：${a(12)}`,
+     todo:"家族割の対象になるか、適用されているかを確認する。",
+     priority: facts.familyTag!=="1" && ["使ってない気がする","対象か分からない","一部だけ使っている"].includes(a(12))},
+    {label:"セット割（ネット・電気）", answer:`ネット：${a(14)}／電気・ガス：${a(15)}`,
+     todo:"自宅のネット・電気とのセット割の対象になるか、適用されているかを確認する。",
+     priority: ["unset","unknown"].includes(facts.netsetTag) || ["unset","unknown"].includes(facts.energysetTag)},
+    {label:"端末の支払い", answer:`端末：${a(8)}`,
+     todo: a(8)==="分割払い中（残債あり）" ? "分割の残りと、乗り換えた場合の支払いの扱いを確認する。" : "乗り換え先で今の端末がそのまま使えるか（対応機種）を確認する。",
+     priority: a(8)==="分割払い中（残債あり）"},
+    {label:"最後に見直した時期", answer:`最後の見直し：${a(18)}／後回し：${a(19)}`,
+     todo:"今の契約内容（プラン名・オプション・割引）を一覧にしてから比べる。",
+     priority: ["2〜3年前","見直した記憶がない"].includes(a(18)) || ["かなり後回しにしてる","完全に放置してる"].includes(a(19))},
   ];
-  const bdHtml = bdItems.map(b=>`
-    <div class="bd-item">
-      <div class="ico">${b.flag ? '!' : '✓'}</div>
-      <div>${b.label}${b.flag ? '：見直しの余地あり' : '：問題なさそう'}</div>
-    </div>`).join('');
+  const pri = items.filter(x=>x.priority);
+  const rest = items.filter(x=>!x.priority);
 
-  const angle = Math.PI - (pct/100)*Math.PI;
-  const cx=110, cy=100, r=80;
-  const needleX = cx + r*0.72*Math.cos(angle);
-  const needleY = cy - r*0.72*Math.sin(angle);
-  const gaugeSVG = `
-  <svg width="220" height="120" viewBox="0 0 220 120">
-    <path d="M 30 100 A 80 80 0 0 1 74 27" stroke="#12B76A" stroke-width="14" fill="none" stroke-linecap="round"/>
-    <path d="M 74 27 A 80 80 0 0 1 146 27" stroke="#FFA43D" stroke-width="14" fill="none" stroke-linecap="round"/>
-    <path d="M 146 27 A 80 80 0 0 1 190 100" stroke="#FF4D5E" stroke-width="14" fill="none" stroke-linecap="round"/>
-    <circle cx="${cx}" cy="${cy}" r="7" fill="${rankColor}"/>
-    <line x1="${cx}" y1="${cy}" x2="${needleX}" y2="${needleY}" stroke="${rankColor}" stroke-width="4" stroke-linecap="round"/>
-  </svg>`;
+  const itemHtml = (x)=>`
+    <div class="bd-item">
+      <div class="ico">${x.priority ? '!' : '✓'}</div>
+      <div><b>${x.label}</b><div class="hidden-note">${x.answer}</div><div>${x.todo}</div></div>
+    </div>`;
 
   card.innerHTML = `
-    <div class="gauge-wrap">
-      ${gaugeSVG}
-      <div class="gauge-num">${pct}<span>% 乗り換え推奨度</span></div>
-    </div>
-    <div style="text-align:center;"><span class="rank-badge" style="background:${rankColor}">${rank}</span></div>
-    <div class="rank-title">${title}</div>
-    <div class="rank-desc">${desc}</div>
+    <div class="rank-title">あなたの見直しポイント</div>
+    <div class="rank-desc">回答から、先に確認したい項目は${pri.length}つです。</div>
 
-    <div class="breakdown-title" style="margin-top:4px;">1回線あたり</div>
     <div class="stat-grid">
       <div class="stat-box">
-        <div class="label">削減額／月</div>
-        <div class="value">${monthlySavings.toLocaleString()}<small>円</small></div>
-      </div>
-      <div class="stat-box">
-        <div class="label">削減額／年</div>
-        <div class="value">${yearlySavings.toLocaleString()}<small>円</small></div>
+        <div class="label">今のスマホ代（選んだ範囲）</div>
+        <div class="value">${facts.billText}<small>/月</small></div>
       </div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-box">
-        <div class="label">想定キャッシュバック</div>
-        <div class="value">${cb.lo.toLocaleString()}〜${cb.hi.toLocaleString()}<small>円</small></div>
-      </div>
-      <div class="stat-box">
-        <div class="label">現在のプラン目安</div>
-        <div class="value">${facts.billMid.toLocaleString()}<small>円/月</small></div>
-      </div>
-    </div>
-    <div class="stat-total">
-      <div class="label">1回線・初年度トータル想定メリット</div>
-      <div class="value">${firstYearTotal.toLocaleString()}<small>円</small></div>
-    </div>
-
-    ${lineCount > 1 ? `
-    <div class="breakdown-title" style="margin-top:18px;">家族全体（${lineCount}回線ぶん）</div>
-    <div class="stat-grid">
-      <div class="stat-box">
-        <div class="label">削減額／月（家族計）</div>
-        <div class="value">${famMonthlySavings.toLocaleString()}<small>円</small></div>
-      </div>
-      <div class="stat-box">
-        <div class="label">削減額／年（家族計）</div>
-        <div class="value">${famYearlySavings.toLocaleString()}<small>円</small></div>
-      </div>
-    </div>
-    <div class="stat-grid">
-      <div class="stat-box">
-        <div class="label">想定キャッシュバック（家族計）</div>
-        <div class="value">${famCashback.toLocaleString()}<small>円</small></div>
-      </div>
-      <div class="stat-box">
-        <div class="label">回線数</div>
-        <div class="value">${lineCount}<small>回線</small></div>
-      </div>
-    </div>
-    <div class="stat-total">
-      <div class="label">家族全体・初年度トータル想定メリット</div>
-      <div class="value">${famFirstYearTotal.toLocaleString()}<small>円</small></div>
-    </div>
-    ` : ''}
-
-    <div class="urgency-strip">${urgency}</div>
 
     <div class="breakdown">
-      <div class="breakdown-title">チェックポイント内訳</div>
-      ${bdHtml}
+      <div class="breakdown-title">先に確認したい項目</div>
+      ${pri.length ? pri.map(itemHtml).join('') : '<div class="hidden-note">回答からは、特に先に確認したい項目はありませんでした。</div>'}
+    </div>
+    <div class="breakdown">
+      <div class="breakdown-title">あわせて確認する項目</div>
+      ${rest.map(itemHtml).join('')}
     </div>
 
+    <div class="breakdown">
+      <div class="breakdown-title">申込前に確認する料金・割引・還元条件</div>
+      <div class="bd-item"><div class="ico">1</div><div>乗り換え先の月額：割引が終わったあとの金額と、割引が続く期間</div></div>
+      <div class="bd-item"><div class="ico">2</div><div>キャッシュバック・還元：受け取れる時期、受け取りの条件（オプション加入・維持期間など）、現金かポイントか</div></div>
+      <div class="bd-item"><div class="ico">3</div><div>乗り換えにかかる費用：事務手数料、端末の残りの支払い</div></div>
+    </div>
+
+    <div class="disclaimer">現在の契約を見直すための概算です。特定の案件の収支を計算した結果ではありません。実際の料金・割引・還元条件は申込先で確認してください。</div>
+
     <a class="cta" href="https://lin.ee/AsTWK4D" target="_blank" rel="noopener">LINEで診断結果を送って相談する</a>
-    <p class="cta-sub">リプ欄に「乗り換え診断」と送ってもOK。結果のスクショを送ってくれれば、あなたに合ったキャリア・プランを個別に提案します🙋‍♂️</p>
+    <p class="cta-sub">結果画面のスクショを送ってください。電話番号・氏名などの個人情報は送らないでください。</p>
 
     <button class="restart" onclick="renderIntro()">もう一度診断する</button>
   `;
